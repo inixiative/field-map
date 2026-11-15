@@ -61,6 +61,8 @@ The library returns:
 type PrismaMap = Record<string, {
   dbName: string | null;
   fields: Record<string, ScalarField | EnumField | RelationField>;
+  indexes?: IndexEntry[]; // @@index / @@unique / @@id / @@fulltext
+  annotations?: Annotations; // see Annotation DSL
 }>;
 ```
 
@@ -189,6 +191,12 @@ import {
   getRelations,
   pickColumns,
   relationForeignKey,
+  tableName,
+  columnName,
+  storedValue,
+  hasColumn,
+  isScalarField,
+  isEnumField,
   parseTagClasses,
   type PrismaMap,
   type ModelEntry,
@@ -197,16 +205,23 @@ import {
   type EnumField,
   type RelationField,
   type IndexEntry,
+  type IndexKind,
+  type EnumValues,
+  type FieldDefault,
+  type FieldDefaultValue,
   type RelationInfo,
   type Identifier,
   type Annotations,
+  type AnnoValue,
+  type DbIdentifier,
+  type DbValue,
 } from '@inixiative/prisma-map';
 ```
 
 Version-specific exports:
 
 ```ts
-import { buildPrismaMapV7, parseRuntimeDataModel, parseInlineSchema, parseRelationFks, parseEnumValues, parseSchemaStructure } from '@inixiative/prisma-map/v7';
+import { buildPrismaMapV7, parseRuntimeDataModel, parseInlineSchema, parseRelationFks, parseEnumValues, parseSchemaStructure, type ModelStructure } from '@inixiative/prisma-map/v7';
 import { buildPrismaMapV6, parseSchemaText, buildFromSchemaFile } from '@inixiative/prisma-map/v6';
 ```
 
