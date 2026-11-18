@@ -1,6 +1,6 @@
 {
   "name": "@inixiative/field-map",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "The schema map the inixiative building blocks read: one typed shape for models, fields, relations and enums, read from a Prisma client or a JSON Schema, with compile-time paths",
   "type": "module",
   "main": "./dist/index.cjs",

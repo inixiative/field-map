@@ -45,3 +45,15 @@ describe('fieldAtPath: the field a dotted path ends on', () => {
     expect(relationTargetOf({ kind: 'scalar', type: 'String' })).toBeNull();
   });
 });
+
+describe('readers over a literal map', () => {
+  it('type a model and a field as the map declares them, not as {}', () => {
+    const model = modelOf(prismaMap, String('User'));
+    const fields = Object.entries(model?.fields ?? {});
+    const kinds: string[] = fields.map(([, entry]) => entry.kind);
+    expect(kinds).toContain('scalar');
+    const field = fieldOf(prismaMap, String('User'), 'email');
+    const kind: 'scalar' | 'enum' | 'object' | undefined = field?.kind;
+    expect(kind).toBe('scalar');
+  });
+});

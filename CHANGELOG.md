@@ -1,3 +1,10 @@
+## 0.1.1 — modelOf / fieldOf over a literal map
+
+Fix: over a literal map (`typeof prismaMap`, no index signature), `modelOf` and `fieldOf` typed
+their result `{}`, because `M['models'][string]` doesn't index an object with known keys. They now
+type it as the union of the map's models, and of their fields. Found moving template onto 0.1.0
+(`Object.entries(modelOf(prismaMap, model)?.fields ?? {})`).
+
 ## 0.1.0 — the schema map in one package, with compile-time paths
 
 Unreleased. Why: the map every building block reads was written twice (prisma-map's `PrismaMap`
