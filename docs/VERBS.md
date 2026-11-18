@@ -31,7 +31,7 @@ field-map record is read through `own` only.
 | convert | `fieldMapFromJsonSchema` | A field map read from a JSON Schema (zod's `z.toJSONSchema`, or an OpenAPI component schema with its `document`). |
 | write | `fieldMapModuleSource` | The text of a module holding a field map `as const satisfies FieldMap`, its type, and extra exports. |
 
-Types: `FieldMap`, `FieldMapDraft`, `ModelEntry`, `FieldEntry`, `ScalarField`, `EnumField`,
+Types: `FieldMap`, `FieldMapDraft` (and the generic `Draft`, the writable form of a readonly map type), `ModelEntry`, `FieldEntry`, `ScalarField`, `EnumField`,
 `RelationField`, `IndexEntry`, `IndexKind`, `Annotations`, `AnnoValue`, `FieldDefault`,
 `FieldDefaultValue`, `DbIdentifier`, `DbValue`, `Identifier`, `RelationInfo`, `ScalarType`
 (and the const `SCALAR_TYPES`), `JsonSchema`, `JsonSchemaNode`, `FieldMapFromJsonSchemaOptions`,

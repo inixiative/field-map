@@ -33,6 +33,7 @@ export {
   type AnnoValue,
   type DbIdentifier,
   type DbValue,
+  type Draft,
   type EnumField,
   type FieldDefault,
   type FieldDefaultValue,

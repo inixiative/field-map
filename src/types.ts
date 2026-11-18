@@ -147,14 +147,15 @@ export type FieldMap = {
   readonly enums?: { readonly [enumName: string]: readonly string[] };
 };
 
-type Writable<T> = T extends readonly (infer Item)[]
-  ? Writable<Item>[]
+/** The writable form of a readonly map type, for code that builds one in place. */
+export type Draft<T> = T extends readonly (infer Item)[]
+  ? Draft<Item>[]
   : T extends object
-    ? { -readonly [K in keyof T]: Writable<T[K]> }
+    ? { -readonly [K in keyof T]: Draft<T[K]> }
     : T;
 
 /** A FieldMap that code builds in place; a FieldMapDraft is a FieldMap. */
-export type FieldMapDraft = Writable<FieldMap>;
+export type FieldMapDraft = Draft<FieldMap>;
 
 // ─── Relations ────────────────────────────────────────────────────────────────
 
