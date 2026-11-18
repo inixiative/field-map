@@ -25,8 +25,13 @@ export const putOwn = <T>(record: Record<string, T>, key: string, value: T): voi
 /** The structure `modelOf` / `fieldOf` read: a FieldMap, or a map a consumer extends (json-rules'
  *  stitched and projected maps), so one reader serves both. */
 type ModelsOf = { readonly models: { readonly [model: string]: { readonly fields: object } } };
-type ModelOf<M extends ModelsOf> = M['models'][string];
-type FieldOf<M extends ModelsOf> = ModelOf<M>['fields'][keyof ModelOf<M>['fields'] & string];
+// Over a literal map (no index signature) a model is the union of its models, and a field the
+// union of their fields.
+type ModelOf<M extends ModelsOf> = M['models'][keyof M['models']];
+type FieldsOfEach<Model> = Model extends { readonly fields: infer Fields }
+  ? Fields[keyof Fields]
+  : never;
+type FieldOf<M extends ModelsOf> = FieldsOfEach<ModelOf<M>>;
 
 /** A model of a field map, own-property only. */
 export const modelOf = <M extends ModelsOf = FieldMap>(
