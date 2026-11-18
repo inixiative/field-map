@@ -1,4 +1,4 @@
-import type { FieldEntry, FieldMap, ModelEntry } from './types';
+import type { FieldMap } from './types';
 
 /** Own-property read: a name that only exists on Object.prototype reads as absent. */
 export const own = <T>(
@@ -22,13 +22,23 @@ export const putOwn = <T>(record: Record<string, T>, key: string, value: T): voi
   });
 };
 
+/** The structure `modelOf` / `fieldOf` read: a FieldMap, or a map a consumer extends (json-rules'
+ *  stitched and projected maps), so one reader serves both. */
+type ModelsOf = { readonly models: { readonly [model: string]: { readonly fields: object } } };
+type ModelOf<M extends ModelsOf> = M['models'][string];
+type FieldOf<M extends ModelsOf> = ModelOf<M>['fields'][keyof ModelOf<M>['fields'] & string];
+
 /** A model of a field map, own-property only. */
-export const modelOf = (map: FieldMap | undefined, model: string): ModelEntry | undefined =>
-  own(map?.models, model);
+export const modelOf = <M extends ModelsOf = FieldMap>(
+  map: M | undefined,
+  model: string,
+): ModelOf<M> | undefined =>
+  own(map?.models as { readonly [name: string]: ModelOf<M> } | undefined, model);
 
 /** A field of a model, own-property only. */
-export const fieldOf = (
-  map: FieldMap | undefined,
+export const fieldOf = <M extends ModelsOf = FieldMap>(
+  map: M | undefined,
   model: string,
   field: string,
-): FieldEntry | undefined => own(modelOf(map, model)?.fields, field);
+): FieldOf<M> | undefined =>
+  own(modelOf(map, model)?.fields as { readonly [name: string]: FieldOf<M> } | undefined, field);
