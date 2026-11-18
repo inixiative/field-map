@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import { getRelations, relationForeignKey } from '../src/relations';
-import type { PrismaMap, RelationField } from '../src/types';
+import { relationForeignKey, relationsOf } from '../src/relations';
+import type { FieldMap, RelationField } from '../src/types';
 
 const rel = (over: Partial<RelationField>): RelationField => ({
   kind: 'object',
@@ -38,43 +38,60 @@ describe('relationForeignKey', () => {
   });
 });
 
-describe('getRelations', () => {
-  const map: PrismaMap = {
-    Inquiry: {
-      dbName: null,
-      fields: {
-        id: { kind: 'scalar', type: 'String', isRequired: true, isList: false, isId: true },
-        organization: rel({
-          type: 'Organization',
-          fromFields: ['organizationId'],
-          toFields: ['id'],
-        }),
-        parent: rel({
-          type: 'Inquiry',
-          fromFields: ['parentId'],
-          toFields: ['id'],
-          annotations: { tree: { parent: true } },
-        }),
-        children: rel({ type: 'Inquiry', isList: true }),
+describe('relationsOf', () => {
+  const map: FieldMap = {
+    models: {
+      Inquiry: {
+        dbName: null,
+        fields: {
+          id: { kind: 'scalar', type: 'String', isRequired: true, isList: false, isId: true },
+          organization: rel({
+            type: 'Organization',
+            fromFields: ['organizationId'],
+            toFields: ['id'],
+          }),
+          parent: rel({
+            type: 'Inquiry',
+            fromFields: ['parentId'],
+            toFields: ['id'],
+            annotations: { tree: { parent: true } },
+          }),
+          children: rel({ type: 'Inquiry', isList: true }),
+        },
       },
     },
   };
 
   it('lists only object fields with collapsed foreign keys', () => {
-    const relations = getRelations(map, 'Inquiry');
-    expect(relations.map((r) => r.relationName)).toEqual(['organization', 'parent', 'children']);
-    expect(relations.find((r) => r.relationName === 'organization')?.foreignKey).toEqual({
+    const relations = relationsOf(map, 'Inquiry');
+    expect(relations.map((r) => r.field)).toEqual(['organization', 'parent', 'children']);
+    expect(relations.find((r) => r.field === 'organization')?.foreignKey).toEqual({
       id: 'organizationId',
     });
-    expect(relations.find((r) => r.relationName === 'children')?.foreignKey).toBeNull();
+    expect(relations.find((r) => r.field === 'children')?.foreignKey).toBeNull();
+  });
+
+  it('carries isRequired, and reads an absent isList / isRequired as false', () => {
+    const relations = relationsOf(
+      { models: { A: { fields: { b: { kind: 'object', type: 'B' } } } } },
+      'A',
+    );
+    expect(relations).toEqual([
+      { field: 'b', targetModel: 'B', isList: false, isRequired: false, foreignKey: null },
+    ]);
+    expect(relationsOf(map, 'Inquiry')[0]?.isRequired).toBe(true);
+  });
+
+  it('reads own properties only', () => {
+    expect(() => relationsOf(map, 'toString')).toThrow('Model toString not found');
   });
 
   it('carries annotations through to RelationInfo', () => {
-    const parent = getRelations(map, 'Inquiry').find((r) => r.relationName === 'parent');
+    const parent = relationsOf(map, 'Inquiry').find((r) => r.field === 'parent');
     expect(parent?.annotations).toEqual({ tree: { parent: true } });
   });
 
   it('throws on an unknown model', () => {
-    expect(() => getRelations(map, 'Nope')).toThrow();
+    expect(() => relationsOf(map, 'Nope')).toThrow();
   });
 });

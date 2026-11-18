@@ -7,14 +7,14 @@ import {
   storedValue,
   tableName,
 } from '../src/identifiers';
+import { readPrismaSchema } from '../src/prisma/v6/build';
 import type { DbIdentifier, DbValue, EnumField, ScalarField } from '../src/types';
-import { parseSchemaText } from '../src/v6/parseSchemaText';
 
 // A stand-in for a future toSql builder: it must accept only RESOLVED identifiers.
 const eq = (column: DbIdentifier, value: DbValue): string => `${column} = '${value}'`;
 
 describe('DbIdentifier / DbValue brands', () => {
-  const map = parseSchemaText(`
+  const map = readPrismaSchema(`
 enum MissionTypeName {
   SOCIAL_POST @map("Social Post")
 }
@@ -25,7 +25,7 @@ model MissionTypes {
   createdAt        DateTime        @map("created_at")
 }
 `);
-  const model = map.MissionTypes;
+  const model = map.map.models.MissionTypes;
 
   it('accepts resolved identifiers and emits the DB surface', () => {
     const column = columnName(model.fields.missionTypeName as EnumField, 'missionTypeName');

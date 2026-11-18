@@ -1,8 +1,7 @@
-import type { FieldDefault } from './schemaText';
+// The schema map: models, their fields, relations and enums, keyed by Prisma name. Every type is
+// readonly, so a generated `as const` map is a FieldMap with no cast; FieldMapDraft is the
+// writable form for code that builds one in place.
 
-// ─── Annotations (the `/// @tagClass(key: value)` DSL) ───────────────────────
-
-// A single annotation value. Bare words and quoted strings both land as string.
 declare const dbBrand: unique symbol;
 
 /**
@@ -22,119 +21,156 @@ export type DbIdentifier = string & { readonly [dbBrand]: 'identifier' };
  */
 export type DbValue = string & { readonly [dbBrand]: 'value' };
 
-export type AnnoValue = string | number | boolean | Array<string | number | boolean>;
+// ─── Annotations (the `/// @tagClass(key: value)` DSL) ───────────────────────
 
-// Parsed annotations, grouped by tag class: `@tree(parent: true)` →
-// `{ tree: { parent: true } }`. prisma-map stays domain-agnostic — it only
-// records the bag; consumers decide what a tag class means.
-export type Annotations = Record<string, Record<string, AnnoValue>>;
+export type AnnoValue = string | number | boolean | readonly (string | number | boolean)[];
+
+/** Parsed annotations, grouped by tag class: `@tree(parent: true)` → `{ tree: { parent: true } }`.
+ *  The map only records the bag; consumers decide what a tag class means. */
+export type Annotations = { readonly [tagClass: string]: { readonly [key: string]: AnnoValue } };
+
+// ─── Defaults ─────────────────────────────────────────────────────────────────
+
+export type FieldDefaultValue =
+  | string
+  | number
+  | boolean
+  | null
+  | readonly FieldDefaultValue[]
+  | { readonly [key: string]: FieldDefaultValue };
+
+/** `@default(...)`: a value stored as written, or an expression the database or Prisma evaluates
+ *  (`now()`, `uuid()`, `autoincrement()`, `dbgenerated(...)`), never injected. */
+export type FieldDefault =
+  | { readonly kind: 'literal'; readonly value: FieldDefaultValue }
+  | { readonly kind: 'generated'; readonly expression: string };
 
 // ─── Fields ───────────────────────────────────────────────────────────────────
 
+/** The scalar types a column holds, as Prisma names them. */
+export const SCALAR_TYPES = [
+  'String',
+  'Boolean',
+  'Int',
+  'BigInt',
+  'Float',
+  'Decimal',
+  'DateTime',
+  'Json',
+  'Bytes',
+] as const;
+
+export type ScalarType = (typeof SCALAR_TYPES)[number];
+
+/** Whether a type name is one of the scalar types. */
+export const isScalarType = (type: unknown): type is ScalarType =>
+  typeof type === 'string' && (SCALAR_TYPES as readonly string[]).includes(type);
+
+// `isRequired`, `isList`, `isId`, `dbName`, `fromFields`, `toFields` and `values` are optional:
+// absent means unknown, as a hand-written map may leave them. The Prisma readers set them all.
+
 export type ScalarField = {
-  kind: 'scalar';
-  type: string; // 'String' | 'Int' | 'Boolean' | 'DateTime' | 'Float' | 'BigInt' | 'Decimal' | 'Bytes' | 'Json'
-  isRequired: boolean;
-  isList: boolean;
-  isId: boolean;
-  dbName?: string; // column name from `@map("...")`; absent = field name IS the column
-  default?: FieldDefault;
-  annotations?: Annotations;
+  readonly kind: 'scalar';
+  readonly type: ScalarType;
+  readonly isRequired?: boolean;
+  readonly isList?: boolean;
+  readonly isId?: boolean;
+  /** Column name from `@map("...")`; absent = the field name is the column. */
+  readonly dbName?: string;
+  /** The values a column may hold, when a hand-written map fixes them (a `String` column with a
+   *  set of codes); json-rules gates rule values against them as it does an enum's. */
+  readonly values?: readonly string[];
+  readonly default?: FieldDefault;
+  readonly annotations?: Annotations;
 };
 
 export type EnumField = {
-  kind: 'enum';
-  type: string; // enum name, e.g. 'UserRole'
-  isRequired: boolean;
-  isList: boolean;
-  values: string[]; // enum member names, e.g. ['ADMIN', 'USER', 'GUEST']
-  dbName?: string; // COLUMN name from `@map("...")`; absent = field name IS the column
-  // Stored DB VALUES from `@map("...")` on enum members, keyed by member name.
-  // Sparse — absent entry means the member name IS the stored value. Distinct
-  // from `dbName` above, which renames the column, not its contents.
-  valueDbNames?: Record<string, string>;
-  default?: FieldDefault;
-  annotations?: Annotations;
+  readonly kind: 'enum';
+  /** The enum's name, e.g. `'UserRole'`. */
+  readonly type: string;
+  readonly isRequired?: boolean;
+  readonly isList?: boolean;
+  /** Member names; absent = the map's `enums[type]`. */
+  readonly values?: readonly string[];
+  /** Column name from `@map("...")`; absent = the field name is the column. */
+  readonly dbName?: string;
+  /** Stored DB values from `@map("...")` on members, keyed by member name; sparse — an absent
+   *  member stores its name. Distinct from `dbName`, which renames the column, not its contents. */
+  readonly valueDbNames?: { readonly [member: string]: string };
+  readonly default?: FieldDefault;
+  readonly annotations?: Annotations;
 };
 
 export type RelationField = {
-  kind: 'object';
-  type: string; // target model name, e.g. 'User'
-  isList: boolean;
-  isRequired: boolean;
-  relationName?: string;
-  fromFields: string[]; // FK fields on THIS model (empty [] for back-relations)
-  toFields: string[]; // Referenced fields on target model (empty [] for back-relations)
-  annotations?: Annotations;
+  readonly kind: 'object';
+  /** The target model's name. */
+  readonly type: string;
+  readonly isList?: boolean;
+  readonly isRequired?: boolean;
+  /** Disambiguates several relations between the same two models. */
+  readonly relationName?: string;
+  /** Foreign-key fields on this model (empty for a back-relation). */
+  readonly fromFields?: readonly string[];
+  /** The fields they reference on the target (empty for a back-relation). */
+  readonly toFields?: readonly string[];
+  readonly annotations?: Annotations;
 };
 
-export type ModelField = ScalarField | EnumField | RelationField;
+export type FieldEntry = ScalarField | EnumField | RelationField;
 
 // ─── Indexes (`@@index` / `@@unique` / `@@id` / `@@fulltext`) ─────────────────
 
 export type IndexKind = 'index' | 'unique' | 'id' | 'fulltext';
 
 export type IndexEntry = {
-  kind: IndexKind;
-  fields: string[]; // the indexed columns, in declared order
-  name?: string; // explicit `name:` / `map:` if given
-  annotations?: Annotations;
+  readonly kind: IndexKind;
+  /** The indexed columns, in declared order. */
+  readonly fields: readonly string[];
+  /** An explicit `name:` / `map:`. */
+  readonly name?: string;
+  readonly annotations?: Annotations;
 };
 
-// ─── Models / Map ─────────────────────────────────────────────────────────────
+// ─── Models / map ─────────────────────────────────────────────────────────────
 
 export type ModelEntry = {
-  dbName: string | null;
-  fields: Record<string, ModelField>;
-  indexes?: IndexEntry[];
-  annotations?: Annotations;
+  /** Table name from `@@map("...")`; null or absent = the model name is the table. */
+  readonly dbName?: string | null;
+  readonly fields: { readonly [field: string]: FieldEntry };
+  readonly indexes?: readonly IndexEntry[];
+  readonly annotations?: Annotations;
 };
 
-export type PrismaMap = Record<string, ModelEntry>;
+/** A schema map: models keyed by name, and an enum registry (enum name → members). */
+export type FieldMap = {
+  readonly models: { readonly [model: string]: ModelEntry };
+  readonly enums?: { readonly [enumName: string]: readonly string[] };
+};
 
-// ─── Relation traversal ───────────────────────────────────────────────────────
+/** The writable form of a readonly map type, for code that builds one in place. */
+export type Draft<T> = T extends readonly (infer Item)[]
+  ? Draft<Item>[]
+  : T extends object
+    ? { -readonly [K in keyof T]: Draft<T[K]> }
+    : T;
 
-// A foreign key collapsed for lookup: a single same-named pair is the bare field
-// name; otherwise a `{ referencedField: localField }` map. `null` for back-relations.
-export type Identifier = string | Record<string, string>;
+/** A FieldMap that code builds in place; a FieldMapDraft is a FieldMap. */
+export type FieldMapDraft = Draft<FieldMap>;
 
+// ─── Relations ────────────────────────────────────────────────────────────────
+
+/** A foreign key collapsed for lookup: a single same-named pair is the bare field name;
+ *  otherwise a `{ referencedField: localField }` map. */
+export type Identifier = string | { readonly [referencedField: string]: string };
+
+/** A model's relation field, read for traversal. */
 export type RelationInfo = {
-  relationName: string;
-  targetModel: string;
-  isList: boolean;
-  foreignKey: Identifier | null;
-  annotations?: Annotations;
-};
-
-// ─── Internal parsing types — not exported from index ─────────────────────────
-
-export type RuntimeField = {
-  name: string;
-  kind: 'scalar' | 'object' | 'enum';
-  type: string;
-  relationName?: string;
-  isRequired: boolean;
-  isList: boolean;
-  isId: boolean;
-};
-
-export type RuntimeModel = {
-  fields: RuntimeField[];
-  dbName: string | null;
-};
-
-export type RuntimeDataModel = {
-  models: Record<string, RuntimeModel>;
-  enums: Record<string, unknown>;
-  types: Record<string, unknown>;
-};
-
-export type EnumValues = {
-  values: string[]; // member names, in declared order
-  dbNames?: Record<string, string>; // member name -> stored DB value, for members with `@map`
-};
-
-export type RelationFkMapping = {
-  fields: string[];
-  references: string[];
+  /** The relation field's name on the model. */
+  readonly field: string;
+  readonly targetModel: string;
+  readonly isList: boolean;
+  readonly isRequired: boolean;
+  /** null for a back-relation. */
+  readonly foreignKey: Identifier | null;
+  readonly annotations?: Annotations;
 };

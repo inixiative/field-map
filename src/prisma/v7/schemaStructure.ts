@@ -1,5 +1,5 @@
-import { parseTagClasses } from '../annotations';
-import type { Annotations, IndexEntry, IndexKind } from '../types';
+import { parseTagClasses } from '../../annotations';
+import type { Annotations, IndexEntry, IndexKind } from '../../types';
 
 /**
  * Per-model structure carried by `///` doc comments: model-level annotations,
@@ -80,14 +80,14 @@ export const parseSchemaStructure = (schema: string): Map<string, ModelStructure
 
       const indexMatch = line.match(/^@@(index|unique|id|fulltext)\s*\(([\s\S]*)\)\s*$/);
       if (indexMatch) {
+        const nameMatch =
+          indexMatch[2].match(/\bname:\s*"([^"]+)"/) ?? indexMatch[2].match(/\bmap:\s*"([^"]+)"/);
         const entry: IndexEntry = {
           kind: INDEX_KINDS[indexMatch[1]],
           fields: parseIndexFields(indexMatch[2]),
+          ...(nameMatch ? { name: nameMatch[1] } : {}),
+          ...(anno ? { annotations: anno } : {}),
         };
-        const nameMatch =
-          indexMatch[2].match(/\bname:\s*"([^"]+)"/) ?? indexMatch[2].match(/\bmap:\s*"([^"]+)"/);
-        if (nameMatch) entry.name = nameMatch[1];
-        if (anno) entry.annotations = anno;
         structure.indexes.push(entry);
         pending = [];
         continue;

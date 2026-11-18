@@ -1,3 +1,4 @@
+import type { FieldDefault, FieldDefaultValue } from '../types';
 /**
  * Strip a `//` line comment from a schema line, ignoring `//` that appears
  * INSIDE a double-quoted string.
@@ -72,18 +73,6 @@ export const matchModelMapAttribute = (line: string): string | undefined => {
   const raw = line.match(MODEL_MAP)?.[1];
   return raw === undefined ? undefined : decodeEscapes(raw);
 };
-
-export type FieldDefaultValue =
-  | string
-  | number
-  | boolean
-  | null
-  | FieldDefaultValue[]
-  | { [key: string]: FieldDefaultValue };
-
-export type FieldDefault =
-  | { kind: 'literal'; value: FieldDefaultValue }
-  | { kind: 'generated'; expression: string };
 
 const balancedArgument = (text: string, open: number): string | undefined => {
   let depth = 0;

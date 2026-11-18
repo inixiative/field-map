@@ -3,12 +3,14 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { columnName, storedValue, tableName } from '../src/identifiers';
+import { readPrismaClientV6, readPrismaSchema } from '../src/prisma/v6/build';
+import { parseSchemaText } from '../src/prisma/v6/parseSchemaText';
 import type { EnumField, ScalarField } from '../src/types';
-import { buildFromSchemaFile } from '../src/v6/parseSchemaFile';
-import { parseSchemaText } from '../src/v6/parseSchemaText';
+
+const modelsOf = (schema: string) => readPrismaSchema(schema).map.models;
 
 const makeTempDir = (): string => {
-  const dir = join(tmpdir(), `prisma-map-v6-test-${Date.now()}`);
+  const dir = join(tmpdir(), `field-map-v6-test-${Date.now()}`);
   mkdirSync(dir, { recursive: true });
   return dir;
 };
@@ -528,7 +530,7 @@ model User {
     expect(map.User.fields.name).toMatchObject({ kind: 'scalar' });
   });
 
-  it('[P1] parses @relation with extra attribute before it on same line', () => {
+  it('[P1] leaves out a field marked @ignore, as the client does', () => {
     const schema = `
 model Post {
   id       String @id
@@ -542,12 +544,8 @@ model User {
 }
 `;
     const map = parseSchemaText(schema);
-    expect(map.Post.fields.author).toMatchObject({
-      kind: 'object',
-      type: 'User',
-      fromFields: ['authorId'],
-      toFields: ['id'],
-    });
+    expect(map.Post.fields).not.toHaveProperty('author');
+    expect(map.Post.fields.authorId).toMatchObject({ kind: 'scalar', type: 'String' });
   });
 
   it('[P1] treats indented model/enum declarations as model+enum types', () => {
@@ -601,9 +599,9 @@ model Post {
   });
 });
 
-// ─── buildFromSchemaFile ─────────────────────────────────────────────────────
+// ─── readPrismaClientV6 ───────────────────────────────────────────────────────
 
-describe('buildFromSchemaFile', () => {
+describe('readPrismaClientV6', () => {
   it('reads schema.prisma from directory and parses it', () => {
     const dir = makeTempDir();
     const schema = `
@@ -622,7 +620,8 @@ model Post {
     writeFileSync(join(dir, 'schema.prisma'), schema);
 
     try {
-      const map = buildFromSchemaFile(dir);
+      const { map: read } = readPrismaClientV6(dir);
+      const map = read.models;
       expect(map.User.fields.id).toMatchObject({ kind: 'scalar', isId: true });
       expect(map.Post.fields.author).toMatchObject({
         kind: 'object',
@@ -638,7 +637,7 @@ model Post {
   it('throws on missing schema.prisma', () => {
     const dir = makeTempDir();
     try {
-      expect(() => buildFromSchemaFile(dir)).toThrow();
+      expect(() => readPrismaClientV6(dir)).toThrow();
     } finally {
       rmSync(dir, { recursive: true });
     }
@@ -686,15 +685,15 @@ model BrandMissions {
   });
 
   it('keeps member names in `values` — the map does not rewrite the Prisma surface', () => {
-    const map = parseSchemaText(schema);
-    const field = map.BrandMissions.fields.typeName as { values: string[] };
+    const map = modelsOf(schema);
+    const field = map.BrandMissions.fields.typeName as EnumField;
     expect(field.values).not.toContain('Social Post');
   });
 });
 
 describe('identifiers — resolving the DB surface', () => {
   it('resolves table, column and stored value, falling back to the Prisma name', () => {
-    const map = parseSchemaText(`
+    const map = modelsOf(`
 enum MissionTypeName {
   SOCIAL_POST @map("Social Post")
   UNMAPPED

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
-import { matchDefaultAttribute } from '../src/schemaText';
-import { parseSchemaText } from '../src/v6/parseSchemaText';
-import { parseFieldModifiers } from '../src/v7/fieldModifiers';
+import { matchDefaultAttribute } from '../src/prisma/schemaText';
+import { parseSchemaText } from '../src/prisma/v6/parseSchemaText';
+import { parseFieldModifiers } from '../src/prisma/v7/fieldModifiers';
 
 describe('matchDefaultAttribute', () => {
   it('reads an enum member, string, number and boolean as literals', () => {

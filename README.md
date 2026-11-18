@@ -1,275 +1,166 @@
-# @inixiative/prisma-map
+# @inixiative/field-map
 
 > One of the [inixiative](https://www.inixiative.com) building blocks. Stop rediscovering what you need to build. See [all the projects](https://github.com/inixiative).
 
-Reads the Prisma client you already generate and gives you its models, fields, relations and foreign keys as one plain object you can use at runtime. You don't add a Prisma generator or parse the DMMF yourself. The map keys everything by its Prisma name and records the database name wherever `@map` / `@@map` changes it, so code that writes SQL resolves identifiers through `tableName` / `columnName` / `storedValue` instead of guessing. `@inixiative/permissions` walks relations through this map, and `@inixiative/json-rules` reads it as a field map.
+The schema map every inixiative building block reads: your models, their fields, relations and
+enums, keyed by Prisma name, as one plain serializable object with strict types. Read it from the
+Prisma client you already generate, or from a JSON Schema (zod, OpenAPI) for data that has no
+Prisma schema. Generate it as a module with literal types, and model names and field paths are
+checked at compile time.
 
-`@inixiative/prisma-map` builds a `PrismaMap` object that includes:
-- Models and fields
-- Field kinds (`scalar`, `enum`, `object`)
-- Relation FK direction (`fromFields`, `toFields`)
-- Model DB table name (`@@map`) as `dbName`
-- Field DB column name (`@map`) as `dbName`
-- Enum values (ordered), with stored DB values (`@map` on members) as `valueDbNames`
-- Field default (`@default`) as `default`: `{ kind: 'literal', value }` for a value stored as written (enum member, string, number, boolean, list; a Json default parsed to its value; BigInt/Decimal kept as exact text), `{ kind: 'generated', expression }` for a function the database or Prisma evaluates (`now()`, `uuid()`, `dbgenerated(...)`, `autoincrement()`) or a Bytes value; generated defaults are never injected
-
-It supports both Prisma client layouts:
-- Prisma v7: parse generated `internal/class.ts`
-- Prisma v6: parse generated `schema.prisma`
+`@inixiative/json-rules` reads it as the map behind a lens, `@inixiative/permissions` walks
+relations through it, and `@inixiative/rules-builder` builds pickers from it. It replaces
+`@inixiative/prisma-map`, whose Prisma reader lives here now.
 
 ## Installation
 
 ```bash
-bun add @inixiative/prisma-map
+bun add @inixiative/field-map
 ```
 
-or
+## Generate the map from your Prisma client
 
 ```bash
-npm i @inixiative/prisma-map
+bunx field-map generate --client src/generated/client --out src/generated/prismaMap.gen.ts
 ```
 
-## Quick Start
-
-### Prisma v7
+Run it after `prisma generate` (template's `db:generate` does). It reads the generated client
+(Prisma v7's `internal/class.ts`, or the `schema.prisma` Prisma v6 copies there; `--layout` picks one
+when detection can't) and writes:
 
 ```ts
-import { buildPrismaMapV7 } from '@inixiative/prisma-map';
-
-const map = buildPrismaMapV7();
-// or: buildPrismaMapV7('/absolute/path/to/generated/client')
-
-console.log(map.User.fields.posts);
+export const prismaMap = { models: { … }, enums: { … } } as const satisfies FieldMap;
+export type PrismaMap = typeof prismaMap;
+export const unsupportedColumns = { Account: ['search'] } as const;
 ```
 
-### Prisma v6
+Models, fields and enum members are sorted, so a regenerate with no schema change is no diff.
+`@ignore` fields and `@@ignore` models are left out, as the client leaves them out.
+`Unsupported(...)` columns, which the client can't select, are not fields: they are listed in
+`unsupportedColumns` for the raw queries that read them.
+
+In code: `readPrismaClientV7(dir?)`, `readPrismaClientV6(dir?)` and `readPrismaSchema(text)` from
+`@inixiative/field-map/prisma` (Node only) return `{ map, unsupportedColumns }`.
+
+## The shape
 
 ```ts
-import { buildPrismaMapV6 } from '@inixiative/prisma-map';
+type FieldMap = {
+  models: { [model: string]: ModelEntry };
+  enums?: { [enumName: string]: readonly string[] };
+};
 
-const map = buildPrismaMapV6();
-// or: buildPrismaMapV6('/absolute/path/to/generated/client')
-
-console.log(map.Post.fields.author);
-```
-
-## Output Shape
-
-The library returns:
-
-```ts
-type PrismaMap = Record<string, {
-  dbName: string | null;
-  fields: Record<string, ScalarField | EnumField | RelationField>;
+type ModelEntry = {
+  dbName?: string | null; // @@map
+  fields: { [field: string]: ScalarField | EnumField | RelationField };
   indexes?: IndexEntry[]; // @@index / @@unique / @@id / @@fulltext
   annotations?: Annotations; // see Annotation DSL
-}>;
+};
 ```
-
-### Scalar field
-
-```json
-{
-  "kind": "scalar",
-  "type": "String",
-  "isRequired": true,
-  "isList": false,
-  "isId": false
-}
-```
-
-### Enum field
-
-```json
-{
-  "kind": "enum",
-  "type": "UserRole",
-  "isRequired": true,
-  "isList": false,
-  "values": ["ADMIN", "USER", "GUEST"]
-}
-```
-
-### Relation field
-
-```json
-{
-  "kind": "object",
-  "type": "User",
-  "isList": false,
-  "isRequired": true,
-  "relationName": "AuthoredPosts",
-  "fromFields": ["authorId"],
-  "toFields": ["id"]
-}
-```
-
-`fromFields`/`toFields` are empty arrays on back-relations.
-
-## Example End-to-End
-
-Given:
-
-```prisma
-enum Role {
-  ADMIN
-  USER
-}
-
-model User {
-  id    String @id
-  role  Role
-  posts Post[]
-
-  @@map("users")
-}
-
-model Post {
-  id       String @id
-  authorId String
-  author   User   @relation("AuthoredPosts", fields: [authorId], references: [id])
-}
-```
-
-A representative map:
-
-```json
-{
-  "User": {
-    "dbName": "users",
-    "fields": {
-      "id": {
-        "kind": "scalar",
-        "type": "String",
-        "isRequired": true,
-        "isList": false,
-        "isId": true
-      },
-      "role": {
-        "kind": "enum",
-        "type": "Role",
-        "isRequired": true,
-        "isList": false,
-        "values": ["ADMIN", "USER"]
-      },
-      "posts": {
-        "kind": "object",
-        "type": "Post",
-        "isList": true,
-        "isRequired": true,
-        "fromFields": [],
-        "toFields": []
-      }
-    }
-  },
-  "Post": {
-    "dbName": null,
-    "fields": {
-      "author": {
-        "kind": "object",
-        "type": "User",
-        "isList": false,
-        "isRequired": true,
-        "relationName": "AuthoredPosts",
-        "fromFields": ["authorId"],
-        "toFields": ["id"]
-      }
-    }
-  }
-}
-```
-
-## API
-
-Root exports:
 
 ```ts
-import {
-  buildPrismaMapV6,
-  buildPrismaMapV7,
-  getColumns,
-  getRelations,
-  pickColumns,
-  relationForeignKey,
-  tableName,
-  columnName,
-  storedValue,
-  hasColumn,
-  isScalarField,
-  isEnumField,
-  parseTagClasses,
-  type PrismaMap,
-  type ModelEntry,
-  type ModelField,
-  type ScalarField,
-  type EnumField,
-  type RelationField,
-  type IndexEntry,
-  type IndexKind,
-  type EnumValues,
-  type FieldDefault,
-  type FieldDefaultValue,
-  type RelationInfo,
-  type Identifier,
-  type Annotations,
-  type AnnoValue,
-  type DbIdentifier,
-  type DbValue,
-} from '@inixiative/prisma-map';
+{ kind: 'scalar', type: 'DateTime', isRequired: true, isList: false, isId: false, dbName: 'created_at', default: { kind: 'generated', expression: 'now()' } }
+{ kind: 'enum', type: 'Role', isRequired: true, isList: false, values: ['ADMIN', 'USER'], valueDbNames: { ADMIN: 'admin' } }
+{ kind: 'object', type: 'User', isList: false, isRequired: true, relationName: 'PostToUser', fromFields: ['authorId'], toFields: ['id'] }
 ```
 
-Version-specific exports:
+- A scalar's `type` is one of `SCALAR_TYPES`: `String`, `Boolean`, `Int`, `BigInt`, `Float`,
+  `Decimal`, `DateTime`, `Json`, `Bytes`.
+- Every type is readonly, so a generated `as const` map is a `FieldMap` with no cast. Code that
+  builds a map in place uses `FieldMapDraft`.
+- `isRequired`, `isList`, `isId`, `dbName`, `fromFields`, `toFields`, `values` and `default` are
+  optional: absent means unknown, as a hand-written map may leave them. The Prisma readers always
+  set them. An enum field without `values` takes them from `enums[type]`.
+
+## Compile-time paths
+
+Over the generated map's type, names and paths are checked as you write them:
 
 ```ts
-import { buildPrismaMapV7, parseRuntimeDataModel, parseInlineSchema, parseRelationFks, parseEnumValues, parseSchemaStructure, type ModelStructure } from '@inixiative/prisma-map/v7';
-import { buildPrismaMapV6, parseSchemaText, buildFromSchemaFile } from '@inixiative/prisma-map/v6';
+import type { ModelNameOf, ScalarPath, RelationPath } from '@inixiative/field-map';
+import type { PrismaMap } from './generated/prismaMap.gen';
+
+const model: ModelNameOf<PrismaMap> = 'OrganizationUser';
+const value: ScalarPath<PrismaMap, 'OrganizationUser'> = 'organization.name'; // through a to-one relation
+const json: ScalarPath<PrismaMap, 'AuditLog'> = 'changes.any.sub.path'; // into a Json column
+const list: RelationPath<PrismaMap, 'OrganizationUser'> = 'tokens'; // what an array or aggregate rule names
+// @ts-expect-error a path past a to-many relation reads no single row
+const bad: ScalarPath<PrismaMap, 'OrganizationUser'> = 'tokens.name';
 ```
 
-## Columns
+`ScalarPath` follows to-one relations up to a depth (default 3) and never passes a to-many relation,
+as json-rules reads a field rule. Over a map typed only as `FieldMap`, every path type is `string`,
+so code without a literal map is unchanged. Also: `FieldNameOf`, `ScalarFieldNameOf`,
+`RelationFieldNameOf`, `RelationTargetOf`, `RelationPathTarget`, `IsToMany`. The check holds them to
+a compile-time budget over a real 35-model map.
 
-`getColumns(map, modelName)` lists a model's column field names (scalar and enum
-fields). `pickColumns(map, modelName, row)` keeps only those keys of a row, so a
-write result carrying `include`d relations reduces to the record itself.
+## Reading a map
+
+Every read is own-property only: a model or field named `toString` never resolves from
+`Object.prototype`.
 
 ```ts
-import { getColumns, pickColumns } from '@inixiative/prisma-map';
+import { modelOf, fieldOf, fieldAtPath, relationTarget, relationsOf, columnsOf, pickColumns } from '@inixiative/field-map';
 
-getColumns(map, 'User');
-// ['id', 'role']
-
-pickColumns(map, 'User', { id: 'u1', role: 'ADMIN', posts: [{ id: 'p1' }] });
-// { id: 'u1', role: 'ADMIN' }
+fieldAtPath(prismaMap, 'OrganizationUser', 'organization.name'); // the ScalarField
+relationTarget(prismaMap, 'OrganizationUser', 'user.organizationUsers'); // 'OrganizationUser'
+relationsOf(prismaMap, 'Inquiry'); // [{ field, targetModel, isList, isRequired, foreignKey, annotations? }]
+columnsOf(prismaMap, 'User'); // scalar and enum field names
+pickColumns(prismaMap, 'User', row); // the row without included relations
 ```
 
-## Relation Traversal
+`relationForeignKey(field)` collapses one relation's foreign key: a bare field name for one
+same-named pair, a `{ referencedField: localField }` map otherwise, `null` for a back-relation.
 
-`getRelations(map, modelName)` lists a model's relation fields with their foreign
-keys collapsed for lookup; `relationForeignKey(field)` does the collapse alone.
+## From a JSON Schema
 
 ```ts
-import { getRelations } from '@inixiative/prisma-map';
+import { fieldMapFromJsonSchema } from '@inixiative/field-map';
 
-getRelations(map, 'Inquiry');
-// [
-//   { relationName: 'organization', targetModel: 'Organization', isList: false,
-//     foreignKey: { id: 'organizationId' } },
-//   { relationName: 'parent', targetModel: 'Inquiry', isList: false,
-//     foreignKey: { id: 'parentId' }, annotations: { tree: { parent: true } } },
-//   { relationName: 'children', targetModel: 'Inquiry', isList: true, foreignKey: null },
-// ]
+const events = fieldMapFromJsonSchema(z.toJSONSchema(EventEnvelope), { model: 'Event' });
+const rewards = fieldMapFromJsonSchema(spec.components.schemas.Reward, { model: 'Reward', document: spec });
 ```
 
-`foreignKey` is a bare field name for a single same-named pair, a
-`{ referencedField: localField }` map otherwise, and `null` for back-relations.
-Functions are string-keyed. Wrap them with your generated `ModelName` types if
-you want typed accessors.
+The root object is `model`; a nested object is the model `<parent>.<field>`; an array of objects is
+a to-many relation. A `$ref` (`#/$defs/…`, `#/definitions/…`, or with `document` any local pointer
+such as OpenAPI's `#/components/schemas/…`) is the model named after its key, built once, so a
+reused or recursive reference is a relation to it. Strings, `date-time` strings, integers, numbers
+and booleans are String / DateTime / Int / Float / Boolean; a string enum, `const` or union of string
+literals is an enum, registered in `enums`. A nullable shape (`anyOf` with `null`, `type: [X,
+'null']`, `nullable: true`) is X, not required. Records, unions of several shapes, `allOf` of
+several members, tuples and anything untyped are Json, which a rule can still read into by path.
+
+## Resolving DB identifiers
+
+Every key in the map is the **Prisma** name. `dbName` / `valueDbNames` are the only crossings to
+the physical database, and both are sparse: absent means the Prisma name is the DB identifier.
+Resolve them rather than open-coding `?? name`; a missed fallback fails silently (an unmapped enum
+member selects zero rows instead of erroring).
+
+```ts
+import { columnName, hasColumn, isEnumField, storedValue, tableName, type DbIdentifier, type DbValue } from '@inixiative/field-map';
+
+const model = prismaMap.models.BrandMissions;
+tableName(model, 'BrandMissions'); // '@@map' if set, else 'BrandMissions'
+const createdAt = model.fields.createdAt;
+if (hasColumn(createdAt)) columnName(createdAt, 'createdAt'); // 'created_at' via '@map'
+const typeName = model.fields.typeName;
+if (isEnumField(typeName)) storedValue(typeName, 'SOCIAL_POST'); // 'Social Post' via '@map' on the member
+```
+
+They return branded `DbIdentifier` / `DbValue`, so a SQL builder typed with the brands rejects a raw
+Prisma name at compile time:
+
+```ts
+const eq = (column: DbIdentifier, value: DbValue) => `${column} = '${value}'`;
+eq('missionTypeName', 'SOCIAL_POST'); // compile error
+```
 
 ## Annotation DSL (`/// @tagClass(key: value)`)
 
-Prisma rejects custom attributes, but preserves `///` doc comments: into the
-generated client's `inlineSchema` (v7) and the `schema.prisma` it copies (v6). prisma-map parses a
-small, forward-looking DSL out of those comments, the same way for both, and records it under
-`annotations`, without assigning the tags any meaning.
+Prisma rejects custom attributes but keeps `///` doc comments, in the v7 client's inline schema and
+the `schema.prisma` v6 copies. The readers parse a small DSL out of them into `annotations`,
+without assigning the tags any meaning.
 
 ```prisma
 model Category {
@@ -285,100 +176,34 @@ model Category {
 ```
 
 ```ts
-map.Category.fields.parent.annotations; // { tree: { parent: true } }
-map.Category.indexes;
-// [{ kind: 'index', fields: ['name'], annotations: { search: { fuzzy: true } } }]
+prismaMap.models.Category.fields.parent.annotations; // { tree: { parent: true } }
+prismaMap.models.Category.indexes; // [{ kind: 'index', fields: ['name'], annotations: { search: { fuzzy: true } } }]
 ```
 
-- **Grammar:** `@<tagClass>(<key>: <value>, …)`; multiple tag classes per line allowed.
+- **Grammar:** `@<tagClass>(<key>: <value>, …)`; several tag classes per line.
 - **Values:** `true`/`false` → boolean, numerics → number, `"quoted"`/bare words → string, `[a, b]` → array.
-- **Placement:** a `///` run binds to the declaration directly below it: a model, a field, or an index (`@@index` / `@@unique` / `@@id` / `@@fulltext`). A blank line or a plain `//` breaks the binding.
-- prisma-map only records the bag; what a tag class *means* (e.g. `tree.parent` → "don't auto-recurse up this self-relation") is the consumer's to decide.
+- **Placement:** a `///` run binds to the declaration directly below it: a model, a field, or an
+  index. A blank line or a plain `//` breaks the binding.
+- What a tag class means (`tree.parent`, `permissions.down`) is the consumer's to decide.
 
-## Auto-Detection Behavior
+## Auto-detection
 
-If you omit the path, the library walks upward from `process.cwd()` and checks common generated client locations:
+With no path, the readers walk up from `process.cwd()` through `node_modules/.prisma/client`,
+`node_modules/@prisma/client`, `prisma/generated/client`, `src/generated/client`,
+`src/generated/prisma` and `generated/client`. v7 needs `internal/class.ts`; v6 needs
+`schema.prisma` without it.
 
-- `node_modules/.prisma/client`
-- `node_modules/@prisma/client`
-- `prisma/generated/client`
-- `src/generated/client`
-- `src/generated/prisma`
-- `generated/client`
+## Notes and limits
 
-v7 detection requires `internal/class.ts`.
-v6 detection requires `schema.prisma` and excludes directories that also have `internal/class.ts`.
-
-## Practical Use Cases
-
-- Build rule-engine metadata for JSON rules
-- Resolve template/package dependency graphs via relation edges
-- Generate guardrails (for example, "entity X must include relation Y")
-- Build field-level introspection UIs
-
-## Resolving DB identifiers
-
-`map.X.fields.y` is a `ModelField` union, so narrow it first. Relation fields have
-no column and the resolvers reject them at compile time:
-
-```ts
-import {
-  columnName,
-  hasColumn,
-  isEnumField,
-  storedValue,
-  tableName,
-  type DbIdentifier,
-  type DbValue,
-} from '@inixiative/prisma-map';
-
-const model = map.BrandMissions;
-
-tableName(model, 'BrandMissions'); // '@@map' if set, else 'BrandMissions'
-
-const createdAt = model.fields.createdAt;
-if (hasColumn(createdAt)) {
-  columnName(createdAt, 'createdAt'); // 'created_at' via '@map'
-}
-
-const typeName = model.fields.typeName;
-if (isEnumField(typeName)) {
-  storedValue(typeName, 'SOCIAL_POST'); // 'Social Post' via '@map' on the member
-  storedValue(typeName, 'UNMAPPED'); // 'UNMAPPED' — no '@map', the name is the value
-}
-```
-
-The resolvers return branded `DbIdentifier` / `DbValue` rather than bare `string`. Both
-surfaces are strings, so a mix-up otherwise produces valid SQL that silently matches no
-rows. Type a SQL builder's parameters as the brands and a raw Prisma name becomes a
-compile error:
-
-```ts
-const eq = (column: DbIdentifier, value: DbValue) => `${column} = '${value}'`;
-
-eq('missionTypeName', 'SOCIAL_POST'); // compile error — raw Prisma names rejected
-```
-
-## Notes and Limits
-
-- Every key in the map is the **Prisma** name: `map.User`, `map.User.fields.createdAt`,
-  and the entries of `values`. `dbName` / `valueDbNames` are the only crossings to the
-  physical DB surface, and both are sparse: absent means the Prisma name IS the DB
-  identifier. Resolve them with `tableName` / `columnName` / `storedValue` rather than
-  open-coding `?? name`. A missed fallback fails silently (comparing against an unmapped
-  enum member selects zero rows instead of erroring).
-- `@@map` on a model is emitted as `ModelEntry.dbName`; `@map` on a scalar/enum field as
-  the field's `dbName`; `@map` on enum members as the field's `valueDbNames`.
-- Relation fields never carry `dbName`; they have no column.
-- Native DB type annotations (for example `@db.Text`) are not emitted.
-- `relationName` is included when available in Prisma runtime metadata.
+- `@@map` is `ModelEntry.dbName`; `@map` on a column is the field's `dbName`; `@map` on enum
+  members is the field's `valueDbNames`. Relation fields never carry `dbName`.
+- Native type annotations (`@db.Text`) are not emitted.
+- The verbs, one per operation, are in [`docs/VERBS.md`](docs/VERBS.md).
 
 ## Development
 
 ```bash
-bun run test
-bun run typecheck
-bun run check
+bun run check   # typecheck (with the type budget), lint, tests
 bun run build
 ```
 

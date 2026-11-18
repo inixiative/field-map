@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'bun:test';
 import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { buildPrismaMapV7 } from '../src/v7/build';
-import { parseInlineSchema } from '../src/v7/inlineSchema';
-import { parseEnumValues } from '../src/v7/parseEnumValues';
-import { parseRelationFks } from '../src/v7/relationFks';
-import { parseRuntimeDataModel } from '../src/v7/runtimeDataModel';
+import { readPrismaClientV7 } from '../src/prisma/v7/build';
+import { parseInlineSchema } from '../src/prisma/v7/inlineSchema';
+import { parseEnumValues } from '../src/prisma/v7/parseEnumValues';
+import { parseRelationFks } from '../src/prisma/v7/relationFks';
+import { parseRuntimeDataModel } from '../src/prisma/v7/runtimeDataModel';
 import { makeClassTs, makeFixtureDir } from './fixtures/v7';
 
 // ─── parseRelationFks (pure function — no file IO) ────────────────────────────
@@ -312,10 +312,10 @@ describe('parseInlineSchema', () => {
   });
 });
 
-// ─── buildPrismaMapV7 end-to-end ─────────────────────────────────────────────
+// ─── readPrismaClientV7 end-to-end ───────────────────────────────────────────
 
-describe('buildPrismaMapV7', () => {
-  it('[P2] end-to-end: builds PrismaMap with scalar and relation fields', () => {
+describe('readPrismaClientV7', () => {
+  it('[P2] end-to-end: builds a field map with scalar and relation fields', () => {
     const runtimeDataModel = {
       models: {
         User: {
@@ -388,7 +388,7 @@ model Post {
     writeFileSync(join(dir, 'internal', 'class.ts'), makeClassTs(runtimeDataModel, inlineSchema));
 
     try {
-      const map = buildPrismaMapV7(dir);
+      const map = readPrismaClientV7(dir).map.models;
       expect(map.User.fields.id).toMatchObject({ kind: 'scalar', type: 'String', isId: true });
       expect(map.User.fields.posts).toMatchObject({
         kind: 'object',
@@ -450,7 +450,7 @@ model Post {
     const dir = makeFixtureDir();
     writeFileSync(join(dir, 'internal', 'class.ts'), makeClassTs(runtimeDataModel, inlineSchema));
     try {
-      const map = buildPrismaMapV7(dir);
+      const map = readPrismaClientV7(dir).map.models;
       expect(map.User.fields.id).toMatchObject({ isId: true, isRequired: true, isList: false });
       expect(map.User.fields.bio).toMatchObject({ isId: false, isRequired: false, isList: false });
       expect(map.User.fields.posts).toMatchObject({
@@ -489,7 +489,7 @@ model User {
     const dir = makeFixtureDir();
     writeFileSync(join(dir, 'internal', 'class.ts'), makeClassTs(runtimeDataModel, inlineSchema));
     try {
-      const map = buildPrismaMapV7(dir);
+      const map = readPrismaClientV7(dir).map.models;
       expect(map.User.fields.createdAt).toMatchObject({ kind: 'scalar', dbName: 'created_at' });
       expect(map.User.fields.id).not.toHaveProperty('dbName');
     } finally {
@@ -590,7 +590,7 @@ model User {
     const dir = makeFixtureDir();
     writeFileSync(join(dir, 'internal', 'class.ts'), makeClassTs(runtimeDataModel, inlineSchema));
     try {
-      const map = buildPrismaMapV7(dir);
+      const map = readPrismaClientV7(dir).map.models;
       const roleField = map.User.fields.role;
       expect(roleField.kind).toBe('enum');
       if (roleField.kind === 'enum') {

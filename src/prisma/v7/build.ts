@@ -1,12 +1,7 @@
+import type { EnumField, RelationField } from '../../types';
 import { autoDetectV7Path } from '../autoDetect';
-import type {
-  EnumField,
-  ModelEntry,
-  ModelField,
-  PrismaMap,
-  RelationField,
-  ScalarField,
-} from '../types';
+import { finishPrismaRead, type PrismaRead, type RawField, type RawModels } from '../read';
+import { parseSchemaText } from '../v6/parseSchemaText';
 import { parseFieldModifiers } from './fieldModifiers';
 import { parseInlineSchema } from './inlineSchema';
 import { parseEnumValues } from './parseEnumValues';
@@ -15,22 +10,15 @@ import { parseRuntimeDataModel } from './runtimeDataModel';
 import { parseSchemaStructure } from './schemaStructure';
 
 /**
- * Build a complete PrismaMap from a Prisma v7 generated client directory.
+ * A field map from a Prisma v7 generated client directory: models and fields from the client's
+ * runtime data model, list / required / id flags, `@map`, `@default`, FKs, enum values and `///`
+ * annotations from its inline schema. `Unsupported(...)` columns, which the runtime data model
+ * leaves out, come from the inline schema into `unsupportedColumns`.
  *
- * @param generatedClientPath - Absolute path to the generated client directory
- *   (the directory containing `internal/class.ts`).
- *   If omitted, auto-detects by walking up from `process.cwd()`.
- *
- * @example
- * ```typescript
- * import { buildPrismaMapV7 } from '@inixiative/prisma-map/v7';
- *
- * const map = buildPrismaMapV7('/path/to/generated/client');
- * // or auto-detect:
- * const map = buildPrismaMapV7();
- * ```
+ * @param generatedClientPath - the client directory (the one containing `internal/class.ts`). If
+ *   omitted, auto-detected by walking up from `process.cwd()`.
  */
-export const buildPrismaMapV7 = (generatedClientPath?: string): PrismaMap => {
+export const readPrismaClientV7 = (generatedClientPath?: string): PrismaRead => {
   const resolvedPath = generatedClientPath ?? autoDetectV7Path();
   const dataModel = parseRuntimeDataModel(resolvedPath);
   const inlineSchema = parseInlineSchema(resolvedPath);
@@ -39,13 +27,13 @@ export const buildPrismaMapV7 = (generatedClientPath?: string): PrismaMap => {
   const fieldModifiers = parseFieldModifiers(inlineSchema);
   const structure = parseSchemaStructure(inlineSchema);
 
-  const map: PrismaMap = {};
+  const map: RawModels = {};
 
   for (const [modelName, model] of Object.entries(dataModel.models)) {
     const modelFks = relationFks.get(modelName);
     const modelMods = fieldModifiers.get(modelName);
     const modelStructure = structure.get(modelName);
-    const fields: Record<string, ModelField> = {};
+    const fields: Record<string, RawField> = {};
 
     for (const field of model.fields) {
       // Prisma v7's runtimeDataModel omits isList/isRequired/isId — read them from the schema.
@@ -61,7 +49,7 @@ export const buildPrismaMapV7 = (generatedClientPath?: string): PrismaMap => {
       const withValueDbNames = valueDbNames ? { valueDbNames } : {};
 
       if (field.kind === 'scalar') {
-        const scalarField: ScalarField = {
+        const scalarField: RawField = {
           kind: 'scalar',
           type: field.type,
           isRequired,
@@ -106,8 +94,20 @@ export const buildPrismaMapV7 = (generatedClientPath?: string): PrismaMap => {
       fields,
       ...(modelStructure?.indexes.length ? { indexes: modelStructure.indexes } : {}),
       ...(modelStructure?.annotations ? { annotations: modelStructure.annotations } : {}),
-    } satisfies ModelEntry;
+    };
   }
 
-  return map;
+  return finishPrismaRead(map, unsupportedColumnsIn(inlineSchema));
+};
+
+// The `Unsupported(...)` columns a schema declares, per model.
+const unsupportedColumnsIn = (schema: string): Record<string, string[]> => {
+  const columns: Record<string, string[]> = {};
+  for (const [model, entry] of Object.entries(parseSchemaText(schema))) {
+    const names = Object.entries(entry.fields)
+      .filter(([, field]) => field.kind === 'scalar' && field.type === 'Unsupported')
+      .map(([name]) => name);
+    if (names.length) columns[model] = names;
+  }
+  return columns;
 };
