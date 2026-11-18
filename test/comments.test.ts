@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'bun:test';
 import { columnName, storedValue, tableName } from '../src/identifiers';
+import { readPrismaSchema } from '../src/prisma/v6/build';
+import { parseSchemaText } from '../src/prisma/v6/parseSchemaText';
 import type { EnumField, ScalarField } from '../src/types';
-import { parseSchemaText } from '../src/v6/parseSchemaText';
-import { parseFieldModifiers } from '../src/v7/fieldModifiers';
+
+const modelsOf = (schema: string) => readPrismaSchema(schema).map.models;
+
+import { parseFieldModifiers } from '../src/prisma/v7/fieldModifiers';
 
 // Regression suite for the adversarial pass. Every case below produced silently
 // WRONG output before the shared, string-literal-aware comment stripper.
@@ -60,7 +64,7 @@ model Weird {
   });
 
   it('D4 — a commented-out @@map does not beat the real one', () => {
-    const map = parseSchemaText(`
+    const map = modelsOf(`
 model User {
   id   String @id
   name String @map("new_name")
@@ -75,7 +79,7 @@ model User {
   });
 
   it('D4 — a commented @@map alone does not fabricate a table', () => {
-    const map = parseSchemaText(`
+    const map = modelsOf(`
 model Plain {
   id String @id
   // @@map("not_real")

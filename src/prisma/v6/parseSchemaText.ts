@@ -1,31 +1,26 @@
+import type { EnumField, RelationField } from '../../types';
+import type { RawField, RawModels } from '../read';
 import {
   matchDefaultAttribute,
   matchMapAttribute,
   matchModelMapAttribute,
   stripLineComment,
 } from '../schemaText';
-import type {
-  EnumField,
-  EnumValues,
-  ModelEntry,
-  ModelField,
-  PrismaMap,
-  RelationField,
-  ScalarField,
-} from '../types';
+import type { EnumValues } from '../types';
 import { parseEnumValues } from '../v7/parseEnumValues';
 import { parseRelationFks } from '../v7/relationFks';
 import { parseSchemaStructure } from '../v7/schemaStructure';
 
 /**
- * Parse a Prisma schema string into a PrismaMap.
+ * Parse a Prisma schema string into the raw models a reader finishes (`finishPrismaRead`).
+ * A model marked `@@ignore` and a field marked `@ignore` are left out: the client has neither.
  *
  * Classifies fields as scalar/enum/object by scanning all model and enum
  * declarations first, then parsing each model's fields line by line.
  * FK info is extracted via the same @relation parser used for v7, and `///` doc-comment
  * annotations (model, field and index) via the same structure parser.
  */
-export const parseSchemaText = (schema: string): PrismaMap => {
+export const parseSchemaText = (schema: string): RawModels => {
   const modelNames = new Set<string>();
   const enumNames = new Set<string>();
 
@@ -35,12 +30,14 @@ export const parseSchemaText = (schema: string): PrismaMap => {
   const relationFks = parseRelationFks(schema);
   const enumValues = parseEnumValues(schema);
   const structure = parseSchemaStructure(schema);
-  const map: PrismaMap = {};
+  const map: RawModels = {};
 
   for (const modelMatch of schema.matchAll(/^\s*model\s+(\w+)\s*\{([\s\S]*?)^\s*\}/gm)) {
     const modelName = modelMatch[1];
     const modelBody = modelMatch[2];
-    const fields: Record<string, ModelField> = {};
+    if (modelBody.split('\n').some((line) => /^@@ignore\b/.test(stripLineComment(line).trim())))
+      continue;
+    const fields: Record<string, RawField> = {};
 
     for (const rawLine of modelBody.split('\n')) {
       const parsed = parseFieldLine(
@@ -82,7 +79,7 @@ export const parseSchemaText = (schema: string): PrismaMap => {
       fields,
       ...(modelStructure?.indexes.length ? { indexes: modelStructure.indexes } : {}),
       ...(modelStructure?.annotations ? { annotations: modelStructure.annotations } : {}),
-    } satisfies ModelEntry;
+    };
   }
 
   return map;
@@ -104,7 +101,7 @@ const parseFieldLine = (
   enumNames: Set<string>,
   relationFks: Map<string, Map<string, { fields: string[]; references: string[] }>>,
   enumValues: Map<string, EnumValues>,
-): { name: string; field: ModelField } | null => {
+): { name: string; field: RawField } | null => {
   // Strip the comment FIRST: `x String // was @map("y")` must not read as a rename.
   const line = stripLineComment(rawLine).trim();
 
@@ -119,6 +116,7 @@ const parseFieldLine = (
   const rest = match[5] ?? '';
   const isRequired = !optional;
   const isList = !!list;
+  if (/@ignore\b/.test(rest)) return null;
   const isId = /@id\b/.test(rest);
   // `@map("...")` renames the COLUMN for scalar/enum fields. Relation fields
   // never carry it (they have no column), so it is only spread below.
@@ -156,7 +154,7 @@ const parseFieldLine = (
     return { name: fieldName, field };
   }
 
-  const field: ScalarField = {
+  const field: RawField = {
     kind: 'scalar',
     type: typeName,
     isRequired,

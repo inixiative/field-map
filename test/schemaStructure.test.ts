@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { parseSchemaStructure } from '../src/v7/schemaStructure';
+import { parseSchemaStructure } from '../src/prisma/v7/schemaStructure';
 
 describe('parseSchemaStructure', () => {
   it('binds a /// annotation to the field directly below it', () => {

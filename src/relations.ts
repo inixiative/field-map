@@ -1,16 +1,18 @@
-import type { Identifier, PrismaMap, RelationField, RelationInfo } from './types';
+import { modelOf } from './own';
+import type { FieldMap, Identifier, RelationField, RelationInfo } from './types';
 
 /**
  * Collapse a relation's FK columns into a lookup Identifier.
  *
- * - `fromFields = []` (back-relations) → `null`
+ * - no `fromFields` (a back-relation) → `null`
  * - a single same-named pair → the bare field name (string)
  * - otherwise → a `{ referencedField: localField }` map
  *
- * Mismatched-length / empty pairs yield `null`.
+ * Mismatched-length pairs yield `null`.
  */
 export const relationForeignKey = (field: RelationField): Identifier | null => {
-  const { fromFields, toFields } = field;
+  const fromFields = field.fromFields ?? [];
+  const toFields = field.toFields ?? [];
   if (fromFields.length === 0 || fromFields.length !== toFields.length) return null;
   if (fromFields.length === 1 && fromFields[0] === toFields[0]) return fromFields[0];
 
@@ -20,27 +22,26 @@ export const relationForeignKey = (field: RelationField): Identifier | null => {
 };
 
 /**
- * List the relation fields of a model as RelationInfo (relation name, target
- * model, list-ness, collapsed foreign key, and any annotations).
- *
- * String-keyed — callers needing typed model/accessor names wrap this with
- * their own generated types.
+ * A model's relation fields as RelationInfo: the field, its target model, list-ness,
+ * required-ness, collapsed foreign key, and any annotations. An absent `isList` or `isRequired`
+ * reads as false.
  *
  * @throws if `modelName` is not in the map.
  */
-export const getRelations = (map: PrismaMap, modelName: string): RelationInfo[] => {
-  const model = map[modelName];
-  if (!model) throw new Error(`Model ${modelName} not found in PrismaMap`);
+export const relationsOf = (map: FieldMap, modelName: string): RelationInfo[] => {
+  const model = modelOf(map, modelName);
+  if (!model) throw new Error(`Model ${modelName} not found in the field map`);
 
   const relations: RelationInfo[] = [];
-  for (const [relationName, field] of Object.entries(model.fields)) {
-    if (field.kind !== 'object') continue;
+  for (const [field, entry] of Object.entries(model.fields)) {
+    if (entry.kind !== 'object') continue;
     relations.push({
-      relationName,
-      targetModel: field.type,
-      isList: field.isList,
-      foreignKey: relationForeignKey(field),
-      ...(field.annotations ? { annotations: field.annotations } : {}),
+      field,
+      targetModel: entry.type,
+      isList: entry.isList ?? false,
+      isRequired: entry.isRequired ?? false,
+      foreignKey: relationForeignKey(entry),
+      ...(entry.annotations ? { annotations: entry.annotations } : {}),
     });
   }
   return relations;

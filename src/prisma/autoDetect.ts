@@ -32,7 +32,7 @@ export const autoDetectV7Path = (startDir: string = process.cwd()): string => {
   if (!found) {
     throw new Error(
       'Could not auto-detect Prisma v7 generated client directory.\n' +
-        'Pass the path explicitly: buildPrismaMapV7("/path/to/generated/client")',
+        'Pass the path explicitly: readPrismaClientV7("/path/to/generated/client")',
     );
   }
   return found;
@@ -52,7 +52,7 @@ export const autoDetectV6Path = (startDir: string = process.cwd()): string => {
   if (!found) {
     throw new Error(
       'Could not auto-detect Prisma v6 generated client directory.\n' +
-        'Pass the path explicitly: buildPrismaMapV6("/path/to/generated/client")',
+        'Pass the path explicitly: readPrismaClientV6("/path/to/generated/client")',
     );
   }
   return found;

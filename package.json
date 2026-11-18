@@ -1,7 +1,7 @@
 {
-  "name": "@inixiative/prisma-map",
-  "version": "0.4.1",
-  "description": "Extracts a model map (fields, relations, FK info, DB names) from a Prisma generated client; supports v6 (schema.prisma) and v7 (runtimeDataModel)",
+  "name": "@inixiative/field-map",
+  "version": "0.1.0",
+  "description": "The schema map the inixiative building blocks read: one typed shape for models, fields, relations and enums, read from a Prisma client or a JSON Schema, with compile-time paths",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -14,7 +14,7 @@
   "scripts": {
     "build": "tsup",
     "test": "bun test",
-    "typecheck": "tsc --noEmit -p tsconfig.check.json",
+    "typecheck": "bun scripts/typeBudget.ts",
     "lint": "biome check .",
     "format": "biome format --write .",
     "check": "bun run typecheck && bun run lint && bun run test",
@@ -23,18 +23,18 @@
   },
   "keywords": [
     "prisma",
-    "orm",
     "schema",
-    "map",
+    "field-map",
+    "json-schema",
+    "openapi",
     "typescript",
-    "prisma-map",
-    "field-map"
+    "codegen"
   ],
   "author": "Aron Greenspan",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/inixiative/prisma-map.git"
+    "url": "git+https://github.com/inixiative/field-map.git"
   },
   "publishConfig": {
     "access": "public"
@@ -45,15 +45,10 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
-    "./v7": {
-      "types": "./dist/v7/index.d.ts",
-      "import": "./dist/v7/index.js",
-      "require": "./dist/v7/index.cjs"
-    },
-    "./v6": {
-      "types": "./dist/v6/index.d.ts",
-      "import": "./dist/v6/index.js",
-      "require": "./dist/v6/index.cjs"
+    "./prisma": {
+      "types": "./dist/prisma/index.d.ts",
+      "import": "./dist/prisma/index.js",
+      "require": "./dist/prisma/index.cjs"
     }
   },
   "devDependencies": {
@@ -63,7 +58,11 @@
     "@types/node": "^25.3.5",
     "lefthook": "2.1.9",
     "tsup": "8.5.1",
-    "typescript": "6.0.3"
+    "typescript": "6.0.3",
+    "zod": "^4.3.6"
   },
-  "packageManager": "bun@1.4.4"
+  "packageManager": "bun@1.4.4",
+  "bin": {
+    "field-map": "./dist/cli.js"
+  }
 }

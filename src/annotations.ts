@@ -52,7 +52,7 @@ const parsePayload = (body: string): Record<string, AnnoValue> => {
  * // → { tree: { parent: true }, order: { by: 'position', dir: 'asc' } }
  */
 export const parseTagClasses = (text: string): Annotations | undefined => {
-  const result: Annotations = {};
+  const result: Record<string, Annotations[string]> = {};
   let found = false;
 
   for (const match of text.matchAll(/@(\w+)\(([^)]*)\)/g)) {

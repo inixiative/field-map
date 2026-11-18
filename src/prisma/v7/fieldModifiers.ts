@@ -1,9 +1,5 @@
-import {
-  type FieldDefault,
-  matchDefaultAttribute,
-  matchMapAttribute,
-  stripLineComment,
-} from '../schemaText';
+import type { FieldDefault } from '../../types';
+import { matchDefaultAttribute, matchMapAttribute, stripLineComment } from '../schemaText';
 export type FieldModifiers = {
   isList: boolean;
   isRequired: boolean;
