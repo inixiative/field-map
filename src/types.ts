@@ -77,6 +77,9 @@ export type ScalarField = {
   readonly isId?: boolean;
   /** Column name from `@map("...")`; absent = the field name is the column. */
   readonly dbName?: string;
+  /** The values a column may hold, when a hand-written map fixes them (a `String` column with a
+   *  set of codes); json-rules gates rule values against them as it does an enum's. */
+  readonly values?: readonly string[];
   readonly default?: FieldDefault;
   readonly annotations?: Annotations;
 };
