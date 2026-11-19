@@ -36,11 +36,12 @@ export const readPrismaClientV7 = (generatedClientPath?: string): PrismaRead => 
     const fields: Record<string, RawField> = {};
 
     for (const field of model.fields) {
-      // Prisma v7's runtimeDataModel omits isList/isRequired/isId — read them from the schema.
+      // Prisma v7's runtimeDataModel omits isList/isRequired/isId/isUnique — read them from the schema.
       const mods = modelMods?.get(field.name);
       const isList = mods?.isList ?? field.isList ?? false;
       const isRequired = mods?.isRequired ?? field.isRequired ?? true;
       const isId = mods?.isId ?? field.isId ?? false;
+      const isUnique = mods?.isUnique ?? false;
       const fieldAnno = modelStructure?.fields.get(field.name);
       const withAnno = fieldAnno ? { annotations: fieldAnno } : {};
       const withDbName = mods?.dbName ? { dbName: mods.dbName } : {};
@@ -55,6 +56,7 @@ export const readPrismaClientV7 = (generatedClientPath?: string): PrismaRead => 
           isRequired,
           isList,
           isId,
+          isUnique,
           ...withDbName,
           ...withDefault,
           ...withAnno,
@@ -66,6 +68,7 @@ export const readPrismaClientV7 = (generatedClientPath?: string): PrismaRead => 
           type: field.type,
           isRequired,
           isList,
+          isUnique,
           values: enumValuesMap.get(field.type)?.values ?? [],
           ...withValueDbNames,
           ...withDbName,

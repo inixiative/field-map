@@ -410,6 +410,55 @@ model Post {
     }
   });
 
+  it('derives isUnique from inlineSchema: a field-level @unique, not a field in a @@unique', () => {
+    const runtimeDataModel = {
+      models: {
+        Account: {
+          dbName: null,
+          fields: [
+            { name: 'id', kind: 'scalar', type: 'String' },
+            { name: 'email', kind: 'scalar', type: 'String' },
+            { name: 'plan', kind: 'enum', type: 'Plan' },
+            { name: 'orgId', kind: 'scalar', type: 'String' },
+            { name: 'slug', kind: 'scalar', type: 'String' },
+          ],
+        },
+      },
+      enums: { Plan: { values: [{ name: 'FREE' }, { name: 'PAID' }] } },
+      types: {},
+    };
+    const inlineSchema = `
+enum Plan {
+  FREE
+  PAID
+}
+
+model Account {
+  id    String @id
+  email String @unique(map: "account_email_key")
+  plan  Plan   @unique
+  orgId String
+  slug  String
+
+  @@unique([orgId, slug])
+}
+`;
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'internal', 'class.ts'), makeClassTs(runtimeDataModel, inlineSchema));
+    try {
+      const map = readPrismaClientV7(dir).map.models;
+      expect(map.Account.fields.email).toMatchObject({ isUnique: true });
+      expect(map.Account.fields.plan).toMatchObject({ kind: 'enum', isUnique: true });
+      expect(map.Account.fields.id).toMatchObject({ isId: true, isUnique: false });
+      expect(map.Account.fields.orgId).toMatchObject({ isUnique: false });
+      expect(map.Account.indexes).toContainEqual(
+        expect.objectContaining({ kind: 'unique', fields: ['orgId', 'slug'] }),
+      );
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+
   it('[P0] derives isList/isRequired/isId from inlineSchema when runtimeDataModel omits them (real v7 shape)', () => {
     // Real Prisma v7 runtimeDataModel fields carry only name/kind/type/relationName.
     const runtimeDataModel = {

@@ -59,7 +59,7 @@ type ModelEntry = {
 ```
 
 ```ts
-{ kind: 'scalar', type: 'DateTime', isRequired: true, isList: false, isId: false, dbName: 'created_at', default: { kind: 'generated', expression: 'now()' } }
+{ kind: 'scalar', type: 'DateTime', isRequired: true, isList: false, isId: false, isUnique: false, dbName: 'created_at', default: { kind: 'generated', expression: 'now()' } }
 { kind: 'enum', type: 'Role', isRequired: true, isList: false, values: ['ADMIN', 'USER'], valueDbNames: { ADMIN: 'admin' } }
 { kind: 'object', type: 'User', isList: false, isRequired: true, relationName: 'PostToUser', fromFields: ['authorId'], toFields: ['id'] }
 ```
@@ -68,7 +68,7 @@ type ModelEntry = {
   `Decimal`, `DateTime`, `Json`, `Bytes`.
 - Every type is readonly, so a generated `as const` map is a `FieldMap` with no cast. Code that
   builds a map in place uses `FieldMapDraft`.
-- `isRequired`, `isList`, `isId`, `dbName`, `fromFields`, `toFields`, `values` and `default` are
+- `isRequired`, `isList`, `isId`, `isUnique`, `dbName`, `fromFields`, `toFields`, `values` and `default` are
   optional: absent means unknown, as a hand-written map may leave them. The Prisma readers always
   set them. An enum field without `values` takes them from `enums[type]`.
 

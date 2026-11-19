@@ -118,6 +118,7 @@ const parseFieldLine = (
   const isList = !!list;
   if (/@ignore\b/.test(rest)) return null;
   const isId = /@id\b/.test(rest);
+  const isUnique = /@unique\b/.test(rest);
   // `@map("...")` renames the COLUMN for scalar/enum fields. Relation fields
   // never carry it (they have no column), so it is only spread below.
   const dbName = matchMapAttribute(rest);
@@ -146,6 +147,7 @@ const parseFieldLine = (
       type: typeName,
       isRequired,
       isList,
+      isUnique,
       values: enumEntry?.values ?? [],
       ...(enumEntry?.dbNames ? { valueDbNames: enumEntry.dbNames } : {}),
       ...withDbName,
@@ -160,6 +162,7 @@ const parseFieldLine = (
     isRequired,
     isList,
     isId,
+    isUnique,
     ...withDbName,
     ...withDefault,
   };

@@ -1,3 +1,13 @@
+## 0.1.2 — isUnique on scalar and enum fields
+
+A field-level `@unique` now sets `isUnique: true` on its scalar or enum field. Both Prisma readers
+set it on every scalar and enum field. A key over several fields stays an `indexes` entry of kind
+`unique` and marks none of its fields, the same split as `isId` and `@@id`. Before this, the map
+recorded `@@unique` and not `@unique`, so a consumer that needed every unique key of a model (the
+template's factory contract test, which checks that each unique key a factory fills changes with
+the sequence) had to read the Prisma client's own data model, and Prisma 7 no longer ships one at
+runtime.
+
 ## 0.1.1 — modelOf / fieldOf over a literal map
 
 Fix: over a literal map (`typeof prismaMap`, no index signature), `modelOf` and `fieldOf` typed

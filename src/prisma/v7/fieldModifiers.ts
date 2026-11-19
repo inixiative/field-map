@@ -4,12 +4,13 @@ export type FieldModifiers = {
   isList: boolean;
   isRequired: boolean;
   isId: boolean;
+  isUnique: boolean;
   dbName?: string; // column name from `@map("...")`; absent = field name IS the column
   default?: FieldDefault;
 };
 
 /**
- * Parse per-field modifiers (isList / isRequired / isId / @map dbName) from
+ * Parse per-field modifiers (isList / isRequired / isId / isUnique / @map dbName) from
  * schema text.
  *
  * Prisma v7's embedded runtimeDataModel omits these, so they must come from the
@@ -51,6 +52,7 @@ export const parseFieldModifiers = (schema: string): Map<string, Map<string, Fie
         isList: !!list,
         isRequired: !optional,
         isId: /@id\b/.test(rest),
+        isUnique: /@unique\b/.test(rest),
         ...(dbName !== undefined ? { dbName } : {}),
         ...(fieldDefault ? { default: fieldDefault } : {}),
       });
