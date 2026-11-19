@@ -100,12 +100,13 @@ Every read is own-property only: a model or field named `toString` never resolve
 `Object.prototype`.
 
 ```ts
-import { modelOf, fieldOf, fieldAtPath, relationTarget, relationsOf, columnsOf, pickColumns } from '@inixiative/field-map';
+import { modelOf, fieldOf, fieldAtPath, relationTarget, relationsOf, columnsOf, pickColumns, uniqueKeysOf } from '@inixiative/field-map';
 
 fieldAtPath(prismaMap, 'OrganizationUser', 'organization.name'); // the ScalarField
 relationTarget(prismaMap, 'OrganizationUser', 'user.organizationUsers'); // 'OrganizationUser'
 relationsOf(prismaMap, 'Inquiry'); // [{ field, targetModel, isList, isRequired, foreignKey, annotations? }]
 columnsOf(prismaMap, 'User'); // scalar and enum field names
+uniqueKeysOf(prismaMap, 'User'); // one-field keys (@id, @unique) in map order, then each @@id / @@unique as its fields
 pickColumns(prismaMap, 'User', row); // the row without included relations
 ```
 
