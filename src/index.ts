@@ -51,4 +51,5 @@ export {
   type ScalarField,
   type ScalarType,
 } from './types';
+export { uniqueKeysOf } from './uniqueKeys';
 export { fieldAtPath, relationTarget, relationTargetOf } from './walk';

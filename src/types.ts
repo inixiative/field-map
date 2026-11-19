@@ -66,7 +66,7 @@ export type ScalarType = (typeof SCALAR_TYPES)[number];
 export const isScalarType = (type: unknown): type is ScalarType =>
   typeof type === 'string' && (SCALAR_TYPES as readonly string[]).includes(type);
 
-// `isRequired`, `isList`, `isId`, `dbName`, `fromFields`, `toFields` and `values` are optional:
+// `isRequired`, `isList`, `isId`, `isUnique`, `dbName`, `fromFields`, `toFields` and `values` are optional:
 // absent means unknown, as a hand-written map may leave them. The Prisma readers set them all.
 
 export type ScalarField = {
@@ -75,6 +75,8 @@ export type ScalarField = {
   readonly isRequired?: boolean;
   readonly isList?: boolean;
   readonly isId?: boolean;
+  /** A field-level `@unique`. A key over several fields is an `indexes` entry of kind `unique`. */
+  readonly isUnique?: boolean;
   /** Column name from `@map("...")`; absent = the field name is the column. */
   readonly dbName?: string;
   /** The values a column may hold, when a hand-written map fixes them (a `String` column with a
@@ -90,6 +92,8 @@ export type EnumField = {
   readonly type: string;
   readonly isRequired?: boolean;
   readonly isList?: boolean;
+  /** A field-level `@unique`. A key over several fields is an `indexes` entry of kind `unique`. */
+  readonly isUnique?: boolean;
   /** Member names; absent = the map's `enums[type]`. */
   readonly values?: readonly string[];
   /** Column name from `@map("...")`; absent = the field name is the column. */

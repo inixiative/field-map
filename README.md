@@ -59,7 +59,7 @@ type ModelEntry = {
 ```
 
 ```ts
-{ kind: 'scalar', type: 'DateTime', isRequired: true, isList: false, isId: false, dbName: 'created_at', default: { kind: 'generated', expression: 'now()' } }
+{ kind: 'scalar', type: 'DateTime', isRequired: true, isList: false, isId: false, isUnique: false, dbName: 'created_at', default: { kind: 'generated', expression: 'now()' } }
 { kind: 'enum', type: 'Role', isRequired: true, isList: false, values: ['ADMIN', 'USER'], valueDbNames: { ADMIN: 'admin' } }
 { kind: 'object', type: 'User', isList: false, isRequired: true, relationName: 'PostToUser', fromFields: ['authorId'], toFields: ['id'] }
 ```
@@ -68,7 +68,7 @@ type ModelEntry = {
   `Decimal`, `DateTime`, `Json`, `Bytes`.
 - Every type is readonly, so a generated `as const` map is a `FieldMap` with no cast. Code that
   builds a map in place uses `FieldMapDraft`.
-- `isRequired`, `isList`, `isId`, `dbName`, `fromFields`, `toFields`, `values` and `default` are
+- `isRequired`, `isList`, `isId`, `isUnique`, `dbName`, `fromFields`, `toFields`, `values` and `default` are
   optional: absent means unknown, as a hand-written map may leave them. The Prisma readers always
   set them. An enum field without `values` takes them from `enums[type]`.
 
@@ -100,12 +100,13 @@ Every read is own-property only: a model or field named `toString` never resolve
 `Object.prototype`.
 
 ```ts
-import { modelOf, fieldOf, fieldAtPath, relationTarget, relationsOf, columnsOf, pickColumns } from '@inixiative/field-map';
+import { modelOf, fieldOf, fieldAtPath, relationTarget, relationsOf, columnsOf, pickColumns, uniqueKeysOf } from '@inixiative/field-map';
 
 fieldAtPath(prismaMap, 'OrganizationUser', 'organization.name'); // the ScalarField
 relationTarget(prismaMap, 'OrganizationUser', 'user.organizationUsers'); // 'OrganizationUser'
 relationsOf(prismaMap, 'Inquiry'); // [{ field, targetModel, isList, isRequired, foreignKey, annotations? }]
 columnsOf(prismaMap, 'User'); // scalar and enum field names
+uniqueKeysOf(prismaMap, 'User'); // one-field keys (@id, @unique) in map order, then each @@id / @@unique as its fields
 pickColumns(prismaMap, 'User', row); // the row without included relations
 ```
 

@@ -34,6 +34,7 @@ model User {
       isRequired: true,
       isList: false,
       isId: true,
+      isUnique: false,
       default: { kind: 'generated', expression: 'cuid()' },
     });
     expect(map.User.fields.name).toEqual({
@@ -42,6 +43,7 @@ model User {
       isRequired: true,
       isList: false,
       isId: false,
+      isUnique: false,
     });
     expect(map.User.fields.email).toEqual({
       kind: 'scalar',
@@ -49,6 +51,7 @@ model User {
       isRequired: false,
       isList: false,
       isId: false,
+      isUnique: false,
     });
     expect(map.User.fields.age).toEqual({
       kind: 'scalar',
@@ -56,6 +59,7 @@ model User {
       isRequired: false,
       isList: false,
       isId: false,
+      isUnique: false,
     });
   });
 
@@ -73,6 +77,7 @@ model Post {
       isRequired: true,
       isList: true,
       isId: false,
+      isUnique: false,
     });
   });
 
@@ -90,6 +95,7 @@ model User {
       isRequired: false,
       isList: false,
       isId: false,
+      isUnique: false,
     });
   });
 
@@ -108,6 +114,7 @@ model Post {
       isRequired: true,
       isList: false,
       isId: false,
+      isUnique: false,
       default: { kind: 'generated', expression: 'now()' },
     });
   });
@@ -126,6 +133,7 @@ model Example {
       isRequired: false,
       isList: false,
       isId: false,
+      isUnique: false,
     });
   });
 });
@@ -288,6 +296,7 @@ model User {
       type: 'UserRole',
       isRequired: true,
       isList: false,
+      isUnique: false,
       values: ['ADMIN', 'USER', 'GUEST'],
       default: { kind: 'literal', value: 'USER' },
     });
@@ -311,6 +320,7 @@ model Post {
       type: 'Status',
       isRequired: false,
       isList: false,
+      isUnique: false,
       values: ['ACTIVE', 'INACTIVE'],
     });
   });
@@ -444,6 +454,7 @@ model User {
       isRequired: true,
       isList: false,
       isId: false,
+      isUnique: false,
       dbName: 'created_at',
     });
     expect(map.User.fields.name).not.toHaveProperty('dbName');
@@ -467,6 +478,7 @@ model User {
       type: 'Role',
       isRequired: true,
       isList: false,
+      isUnique: false,
       values: ['ADMIN', 'USER'],
       dbName: 'user_role',
     });
@@ -485,6 +497,41 @@ model User {
 });
 
 // ─── parseSchemaText — compound PK ──────────────────────────────────────────
+
+describe('parseSchemaText — field-level @unique', () => {
+  const schema = `
+enum Plan {
+  FREE
+  PAID
+}
+
+model Account {
+  id     String @id
+  email  String @unique
+  handle String @unique(map: "account_handle_key")
+  plan   Plan   @unique
+  name   String
+  orgId  String
+  slug   String
+
+  @@unique([orgId, slug])
+}
+`;
+
+  it('marks a field-level @unique, with or without arguments, on scalars and enums', () => {
+    const map = parseSchemaText(schema);
+    expect((map.Account.fields.email as ScalarField).isUnique).toBe(true);
+    expect((map.Account.fields.handle as ScalarField).isUnique).toBe(true);
+    expect((map.Account.fields.plan as EnumField).isUnique).toBe(true);
+    expect((map.Account.fields.name as ScalarField).isUnique).toBe(false);
+  });
+
+  it('leaves a field in a @@unique unmarked: the key is the index entry, not either field', () => {
+    const map = parseSchemaText(schema);
+    expect((map.Account.fields.orgId as ScalarField).isUnique).toBe(false);
+    expect((map.Account.fields.slug as ScalarField).isUnique).toBe(false);
+  });
+});
 
 describe('parseSchemaText — compound PK (@@id)', () => {
   it('marks constituent fields isId: true', () => {

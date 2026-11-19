@@ -18,6 +18,7 @@ field-map record is read through `own` only.
 | read | `relationTargetOf` | The model one relation field leads to; null for a column. |
 | list | `relationsOf` | A model's relation fields as `RelationInfo` (field, target, list-ness, required-ness, foreign key, annotations). |
 | list | `columnsOf` | A model's column fields (scalar and enum), in map order. |
+| list | `uniqueKeysOf` | Every unique key of a model as its field names: field-level `@id` / `@unique`, then each `@@id` / `@@unique`. |
 | pick | `pickColumns` | A row with only its model's column keys. |
 | collapse | `relationForeignKey` | A relation's foreign-key columns as one lookup `Identifier`; null for a back-relation. |
 | resolve a DB name | `tableName` | A model's table: `@@map`, else the model name, branded `DbIdentifier`. |
